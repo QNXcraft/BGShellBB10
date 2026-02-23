@@ -1,0 +1,77 @@
+# Build outputs
+*.o
+*.obj
+*.bar
+*.so
+*.a
+*.exe
+
+# Build directories
+arm/
+x86/
+o/
+o-g/
+o.le-v7/
+o.le-v7-g/
+
+# Qt generated files
+*.pro.user
+*.pro.user.*
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+Makefile
+!_Makefile
+BGShellBB10.pro
+!_BGShellBB10.pro
+bar-descriptor.xml
+!_bar-descriptor.xml
+
+# QNX/BlackBerry specific
+.qnx/
+*.qm
+translations/*.qm
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Node modules (if using any JS tooling)
+node_modules/
+
+# Build artifacts
+*.bar.old
+*.debug
+device/
+simulator/
+
+# Signing keys (NEVER commit these!)
+*.p12
+*.csk
+*.p12.csk
+author.p12
+barsigner.csk
+barsigner.db
+debugtoken.bar
+
+# Archives
+*.zip
+*.tar.gz
+*.tgz
+
+# Release files
+release/
+dist/

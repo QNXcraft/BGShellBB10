@@ -1,0 +1,154 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'release-*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Get version from tag or input
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          VERSION="${{ inputs.tag_name }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Building version: $VERSION"
+    
+    - name: Extract version number from bar-descriptor.xml
+      id: app_version
+      run: |
+        VERSION_NUM=$(grep -oP '<versionNumber>\K[^<]+' _bar-descriptor.xml || echo "0.0.0")
+        BUILD_ID=$(grep -oP '<buildId>\K[^<]+' _bar-descriptor.xml || echo "0")
+        echo "version_number=$VERSION_NUM" >> $GITHUB_OUTPUT
+        echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+        echo "App Version: $VERSION_NUM.$BUILD_ID"
+    
+    - name: Cache BB10 NDK
+      id: cache-ndk
+      uses: actions/cache@v4
+      with:
+        path: ~/bbndk
+        key: ${{ runner.os }}-bbndk-10.3.1
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential zip
+    
+    - name: Prepare build files
+      run: |
+        cp _BGShellBB10.pro BGShellBB10.pro
+        cp _bar-descriptor.xml bar-descriptor.xml
+        cp _Makefile Makefile
+    
+    - name: Build Release BAR
+      id: build
+      continue-on-error: true
+      run: |
+        if [ -f ~/bbndk/bbndk-env.sh ]; then
+          source ~/bbndk/bbndk-env.sh
+          make clean
+          make Device-Release
+          make Device-Release.bar
+          echo "build_success=true" >> $GITHUB_OUTPUT
+        else
+          echo "build_success=false" >> $GITHUB_OUTPUT
+          echo "BB10 NDK not found. Creating source release only."
+        fi
+    
+    - name: Prepare source archive
+      run: |
+        mkdir -p release
+        zip -r release/BGShellBB10-${{ steps.version.outputs.version }}-source.zip \
+          *.cpp *.h *.pro *.xml Makefile README COPYING \
+          assets/ kb-layouts/ \
+          -x "*.o" -x ".git/*" -x ".github/*"
+    
+    - name: Copy BAR file to release directory
+      if: steps.build.outputs.build_success == 'true'
+      run: |
+        if [ -f Device-Release.bar ]; then
+          cp Device-Release.bar release/BGShellBB10-${{ steps.version.outputs.version }}.bar
+        fi
+    
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        cat > release_notes.md << 'EOF'
+        ## BGShellBB10 ${{ steps.version.outputs.version }}
+        
+        **Version:** ${{ steps.app_version.outputs.version_number }}.${{ steps.app_version.outputs.build_id }}
+        
+        ### Release Assets
+        
+        - **BGShellBB10-${{ steps.version.outputs.version }}.bar** - BlackBerry BAR package for installation
+        - **BGShellBB10-${{ steps.version.outputs.version }}-source.zip** - Source code archive
+        
+        ### Installation
+        
+        1. Download the `.bar` file
+        2. Use BlackBerry Link or command line tools to install on your BB10 device
+        3. Or use: `blackberry-deploy -installApp -package BGShellBB10-${{ steps.version.outputs.version }}.bar`
+        
+        ### Features
+        
+        - Terminal window with SSH, SCP, SFTP utilities
+        - Soft keyboard for Alt+ and Ctrl+ key sequences
+        - SSH tunnels (works when app is minimized)
+        - SSH over HTTP Proxy
+        - Works in BlackBerry Balance Work space
+        
+        ### Notes
+        
+        See [README](README) for complete feature list and release history.
+        
+        ---
+        
+        **Project:** BGShellBB10 - Port of QTermWidget to BlackBerry 10
+        
+        **Website:** http://bgmot.com/BGShellPlus
+        EOF
+        
+        echo "Release notes generated"
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: BGShellBB10 ${{ steps.version.outputs.version }}
+        body_path: release_notes.md
+        files: |
+          release/*.bar
+          release/*.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: bgshellbb10-release-${{ steps.version.outputs.version }}
+        path: release/
+        retention-days: 90
