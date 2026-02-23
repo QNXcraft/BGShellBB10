@@ -39,8 +39,8 @@ jobs:
     - name: Extract version number from bar-descriptor.xml
       id: app_version
       run: |
-        VERSION_NUM=$(grep '<versionNumber>' _bar-descriptor.xml | sed 's/.*<versionNumber>\(.*\)<\/versionNumber>.*/\1/' | tr -d ' \t\n' || echo "0.0.0")
-        BUILD_ID=$(grep '<buildId>' _bar-descriptor.xml | sed 's/.*<buildId>\(.*\)<\/buildId>.*/\1/' | tr -d ' \t\n' || echo "0")
+        VERSION_NUM=$(sed -n 's/.*<versionNumber>\([^<]*\)<\/versionNumber>.*/\1/p' _bar-descriptor.xml | tr -d ' \t\n' || echo "0.0.0")
+        BUILD_ID=$(sed -n 's/.*<buildId>\([^<]*\)<\/buildId>.*/\1/p' _bar-descriptor.xml | tr -d ' \t\n' || echo "0")
         echo "version_number=$VERSION_NUM" >> $GITHUB_OUTPUT
         echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
         echo "App Version: $VERSION_NUM.$BUILD_ID"
