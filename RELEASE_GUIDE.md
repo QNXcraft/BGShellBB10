@@ -1,5 +1,29 @@
 # Quick Release Guide
 
+## Adding BAR Files to Releases
+
+⚠️ **Note**: The automated workflow creates source archives. To include BAR installation files, you need to either:
+1. Upload them manually (see below)
+2. Set up BB10 NDK in GitHub Actions (see BUILD_SETUP.md)
+
+### Quick BAR Upload
+
+If you have a built BAR file:
+
+```bash
+# Upload to existing release
+gh release upload TAG_NAME path/to/your.bar --repo QNXcraft/BGShellBB10
+
+# Example:
+gh release upload 0.0.1 Device-Release.bar --repo QNXcraft/BGShellBB10
+```
+
+Or use the GitHub web interface:
+1. Go to: https://github.com/QNXcraft/BGShellBB10/releases
+2. Find your release and click "Edit"
+3. Drag and drop the BAR file into the assets area
+4. Click "Update release"
+
 ## Creating a New Release
 
 ### Method 1: Using Git Tags (Automatic - Recommended for future)

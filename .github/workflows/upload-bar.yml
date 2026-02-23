@@ -1,0 +1,63 @@
+name: Upload BAR to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to upload to'
+        required: true
+        type: string
+      bar_file_url:
+        description: 'URL to download BAR file from (optional)'
+        required: false
+        type: string
+
+jobs:
+  upload-bar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check if release exists
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release view ${{ inputs.tag_name }} --repo ${{ github.repository }} || {
+          echo "Release ${{ inputs.tag_name }} not found!"
+          exit 1
+        }
+    
+    - name: Download BAR file if URL provided
+      if: inputs.bar_file_url != ''
+      run: |
+        wget -O BGShellBB10.bar "${{ inputs.bar_file_url }}"
+        ls -lh BGShellBB10.bar
+    
+    - name: Upload BAR to release
+      if: inputs.bar_file_url != ''
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release upload ${{ inputs.tag_name }} BGShellBB10.bar \
+          --repo ${{ github.repository }} \
+          --clobber
+        
+        echo "✅ BAR file uploaded to release ${{ inputs.tag_name }}"
+        
+    - name: Instructions if no URL provided
+      if: inputs.bar_file_url == ''
+      run: |
+        echo "ℹ️  No BAR file URL provided."
+        echo ""
+        echo "To upload a BAR file manually, use one of these methods:"
+        echo ""
+        echo "1. Using GitHub CLI:"
+        echo "   gh release upload ${{ inputs.tag_name }} /path/to/your.bar --repo ${{ github.repository }}"
+        echo ""
+        echo "2. Using GitHub web interface:"
+        echo "   Go to: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.tag_name }}"
+        echo "   Click 'Edit release' > Drag & drop your BAR file > Save"
