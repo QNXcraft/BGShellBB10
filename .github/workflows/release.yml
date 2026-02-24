@@ -36,6 +36,16 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Building version: $VERSION"
     
+    - name: Create and push tag (workflow_dispatch only)
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -f ${{ steps.version.outputs.version }}
+        git push origin ${{ steps.version.outputs.version }} --force
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Extract version number from bar-descriptor.xml
       id: app_version
       run: |
@@ -138,7 +148,7 @@ jobs:
         echo "Release notes generated"
     
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.version.outputs.version }}
         name: BGShellBB10 ${{ steps.version.outputs.version }}
