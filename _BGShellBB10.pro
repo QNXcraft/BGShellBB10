@@ -5,7 +5,7 @@ CONFIG += qt thread warn_on debug_and_release cascades
 
 SOURCES += *.cpp
 HEADERS += *.h
-LIBS += -lbbplatform
+LIBS += -lbbplatform -lscreen
 
 device {
 	CONFIG(release, debug|release) {
