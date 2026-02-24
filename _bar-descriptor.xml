@@ -32,9 +32,9 @@
 	<author>BGmot</author>
 
     <icon>
-       <image>BGshellPlus_icon114x114.png</image>
+       <image>BGshellPlus_icon110x110.png</image>
     </icon>
-    <asset path="assets/BGshellPlus_icon114x114.png">BGshellPlus_icon114x114.png</asset>
+    <asset path="assets/BGshellPlus_icon110x110.png">BGshellPlus_icon110x110.png</asset>
     <asset path="assets">assets</asset>
     
 	<initialWindow>
