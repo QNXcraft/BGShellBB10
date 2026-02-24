@@ -6,7 +6,7 @@ This document summarizes the GitHub Actions setup created for the BGShellBB10 pr
 
 ### 1. GitHub Actions Workflows
 
-#### `.github/workflows/build.yml`
+#### `.github/workflows/docker-build.yml`
 **Purpose:** Automatic builds on push and pull requests
 
 **Triggers:**
@@ -15,10 +15,9 @@ This document summarizes the GitHub Actions setup created for the BGShellBB10 pr
 - Manual workflow dispatch
 
 **Features:**
-- Checks out code
-- Caches BB10 NDK
-- Sets up build environment
-- Builds the project
+- Pulls BB10 Docker image (`sw7ft/bb10-gcc9:latest`)
+- Builds project inside Docker container
+- Generates BAR installation package
 - Uploads build artifacts
 
 #### `.github/workflows/release.yml`
@@ -30,19 +29,11 @@ This document summarizes the GitHub Actions setup created for the BGShellBB10 pr
 - Manual workflow dispatch with custom tag
 
 **Features:**
-- Builds release BAR package
+- Builds release BAR package using Docker
 - Creates source code archive
 - Generates automatic release notes
 - Creates GitHub release
 - Uploads BAR and source files
-
-#### `.github/workflows/docker-build.yml`
-**Purpose:** Docker-based build for better portability
-
-**Features:**
-- Uses Docker container for isolated build environment
-- Supports pre-built Docker images
-- Can be adapted for self-hosted runners
 
 ### 2. Configuration Files
 
@@ -53,23 +44,17 @@ Excludes build artifacts, temporary files, and sensitive data from version contr
 - IDE files
 - **Important:** Excludes signing keys (`.p12`, `.csk`)
 
-#### `Dockerfile.bb10`
-Docker container definition for BB10 build environment:
-- Based on Ubuntu 18.04
-- Includes build dependencies
-- Placeholder for BB10 NDK installation
-- Ready to customize with actual NDK
-
 ### 3. Build Scripts
 
 #### `build.sh`
-Standalone build script for local development or CI:
-- Auto-detects BB10 NDK
-- Prepares build files
+Docker-based build script for local development:
+- Uses `sw7ft/bb10-gcc9:latest` Docker image
+- No local NDK installation required
+- Prepares build files automatically
 - Supports multiple build types:
   - `clean` - Clean build artifacts
   - `debug` - Build device debug version
-  - `release` - Build device release version
+  - `release` - Build device release version (default)
   - `simulator` - Build simulator version
   - `all` - Build all versions
 
@@ -162,24 +147,20 @@ chmod +x build.sh
    - API tokens
    - Private keys
 
-### BB10 NDK Challenge
+### Docker-Based Build Solution
 
-BlackBerry 10 is a legacy platform. The NDK is no longer officially distributed. Options:
+This project uses the `sw7ft/bb10-gcc9:latest` Docker image which includes:
+- Complete BlackBerry 10 NDK 10.3.1.995
+- All build dependencies pre-installed
+- Pre-configured build environment
 
-1. **Docker approach (recommended):**
-   - Create Docker image with NDK
-   - Push to GitHub Container Registry
-   - Use in workflows
+**No NDK installation required!** Everything runs in Docker.
 
-2. **Self-hosted runner:**
-   - Install NDK on your own server
-   - Configure as GitHub Actions runner
-   - Most reliable for building
-
-3. **Store NDK in releases:**
-   - Upload NDK to private repository
-   - Download in workflow
-   - Slower but works
+**Benefits:**
+- Consistent builds across all environments
+- No complex NDK setup
+- Works on any platform with Docker
+- Same environment for local and CI builds
 
 ### Workflow Customization
 
@@ -205,15 +186,13 @@ To customize workflows for your needs:
 BGShellBB10/
 ├── .github/
 │   └── workflows/
-│       ├── build.yml           # Main build workflow
-│       ├── release.yml         # Release creation workflow
-│       └── docker-build.yml    # Docker-based build
-├── .gitignore                  # Git ignore rules
-├── build.sh                    # Build helper script
-├── Dockerfile.bb10             # Docker build environment
-├── BUILD_SETUP.md              # Detailed setup guide
-├── GITHUB_BADGES.md            # Badge markdown for README
-└── GITHUB_ACTIONS_SUMMARY.md   # This file
+│       ├── docker-build.yml        # Build workflow (Docker-based)
+│       └── release.yml             # Release creation workflow
+├── .gitignore                      # Git ignore rules
+├── build.sh                        # Docker build helper script
+├── BUILD_SETUP.md                  # Detailed setup guide
+├── GITHUB_BADGES.md                # Badge markdown for README
+└── GITHUB_ACTIONS_SUMMARY.md       # This file
 ```
 
 ## Next Steps

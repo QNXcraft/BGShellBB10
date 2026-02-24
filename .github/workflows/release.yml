@@ -45,17 +45,13 @@ jobs:
         echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
         echo "App Version: $VERSION_NUM.$BUILD_ID"
     
-    - name: Cache BB10 NDK
-      id: cache-ndk
-      uses: actions/cache@v4
-      with:
-        path: ~/bbndk
-        key: ${{ runner.os }}-bbndk-10.3.1
+    - name: Pull BB10 Docker image
+      run: docker pull sw7ft/bb10-gcc9:latest
     
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential zip
+        sudo apt-get install -y zip
     
     - name: Prepare build files
       run: |
@@ -63,19 +59,27 @@ jobs:
         cp _bar-descriptor.xml bar-descriptor.xml
         cp _Makefile Makefile
     
-    - name: Build Release BAR
+    - name: Build Release BAR in Docker
       id: build
-      continue-on-error: true
       run: |
-        if [ -f ~/bbndk/bbndk-env.sh ]; then
-          source ~/bbndk/bbndk-env.sh
-          make clean
-          make Device-Release
-          make Device-Release.bar
+        docker run --rm \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace \
+          sw7ft/bb10-gcc9:latest \
+          bash -c "source /root/bbndk/bbndk-env_10_3_1_995.sh && \
+                   export LC_ALL=C && \
+                   make clean && \
+                   make Device-Release && \
+                   make Device-Release.bar"
+        
+        if [ -f Device-Release.bar ]; then
           echo "build_success=true" >> $GITHUB_OUTPUT
+          echo "✅ BAR file built successfully"
+          ls -lh Device-Release.bar
         else
           echo "build_success=false" >> $GITHUB_OUTPUT
-          echo "BB10 NDK not found. Creating source release only."
+          echo "❌ BAR file build failed"
+          exit 1
         fi
     
     - name: Prepare source archive

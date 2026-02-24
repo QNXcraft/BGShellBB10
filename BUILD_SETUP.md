@@ -1,227 +1,191 @@
 # GitHub Actions Build Setup for BGShellBB10
 
-This document explains how to set up and use GitHub Actions to automatically build and release BGShellBB10.
+This document explains the automated build system for BGShellBB10 using Docker.
 
 ## Overview
 
-This project includes two GitHub Actions workflows:
+This project uses GitHub Actions with a pre-built Docker image (`sw7ft/bb10-gcc9:latest`) that contains the complete BlackBerry 10 NDK toolchain.
 
-1. **Build Workflow** (`.github/workflows/build.yml`) - Automatically builds the project on push/PR
-2. **Release Workflow** (`.github/workflows/release.yml`) - Creates GitHub releases with BAR packages
+**Two workflows:**
+1. **Build Workflow** (`.github/workflows/docker-build.yml`) - Builds on push/PR
+2. **Release Workflow** (`.github/workflows/release.yml`) - Creates releases with BAR files
 
-## Prerequisites
+## How It Works
 
-### BlackBerry 10 NDK Setup
+### Docker Image
 
-Since BlackBerry 10 is a legacy platform, the NDK (Native Development Kit) is not available in standard CI environments. You have several options:
+The build uses `sw7ft/bb10-gcc9:latest` which includes:
+- BlackBerry 10 NDK 10.3.1.995
+- Complete build toolchain
+- All required dependencies
+- Pre-configured environment
 
-#### Option 1: Docker Container (Recommended)
+**Environment setup in the image:**
+- BB10 environment: `/root/bbndk/bbndk-env_10_3_1_995.sh`
+- Locale: `LC_ALL=C`
 
-Create a Docker image with BB10 NDK pre-installed:
+### Automated Builds
 
-```dockerfile
-FROM ubuntu:18.04
+Every push to `master`, `main`, or `develop` branches triggers:
+1. Pull the Docker image
+2. Prepare build files (copy from `_*.pro`, `_*.xml`)
+3. Build inside Docker container
+4. Generate Device-Release.bar
+5. Upload build artifacts
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    wget \
-    unzip \
-    libx11-6 \
-    libxext6 \
-    libxrender1
+### Automated Releases
 
-# Copy and install BB10 NDK
-# You'll need to provide the NDK installer
-COPY bbndk-*.run /tmp/
-RUN chmod +x /tmp/bbndk-*.run && \
-    /tmp/bbndk-*.run --silent && \
-    rm /tmp/bbndk-*.run
-
-ENV QNX_HOST=/path/to/ndk/host
-ENV QNX_TARGET=/path/to/ndk/target
-```
-
-Then push this to Docker Hub or GitHub Container Registry and modify the workflow to use it.
-
-#### Option 2: Self-Hosted Runner
-
-Set up a self-hosted GitHub Actions runner on a machine with BB10 NDK installed:
-
-1. Go to your GitHub repository → Settings → Actions → Runners
-2. Click "New self-hosted runner"
-3. Follow the setup instructions
-4. Install BB10 NDK on that machine
-5. Modify workflows to use: `runs-on: self-hosted`
-
-#### Option 3: NDK in GitHub Releases
-
-Store the BB10 NDK in a private/public GitHub release and download it during the workflow:
-
-```yaml
-- name: Download BB10 NDK
-  run: |
-    wget https://github.com/your-org/bb10-ndk/releases/download/v10.3.1/bbndk.tar.gz
-    tar -xzf bbndk.tar.gz -C ~/bbndk
-```
-
-## Workflow Usage
-
-### Build Workflow
-
-Triggers automatically on:
-- Push to `main`, `master`, or `develop` branches
-- Pull requests to these branches
-- Manual trigger via "Actions" tab
-
-**What it does:**
-- Checks out the code
-- Sets up BB10 NDK (if configured)
-- Builds the project
-- Uploads build artifacts
-
-### Release Workflow
-
-Triggers on:
-- Git tags matching `v*.*.*` (e.g., `v0.0.2.0`)
-- Git tags matching `release-*`
-- Manual trigger with custom tag name
-
-**What it does:**
-- Builds the release BAR package
-- Creates source code archive
-- Generates release notes
-- Creates GitHub release with downloadable assets
+Creating a git tag triggers the release workflow:
+1. Build the BAR file in Docker
+2. Create source archive
+3. Generate release notes
+4. Publish GitHub release with:
+   - BAR installation package
+   - Source code ZIP
 
 ## Creating a Release
 
-### Method 1: Git Tags (Recommended)
-
 ```bash
-# Create and push a tag
-git tag -a v0.0.2.1 -m "Release version 0.0.2.1"
+# 1. Update version in _bar-descriptor.xml
+# <versionNumber>0.0.2</versionNumber>
+# <buildId>1</buildId>
+
+# 2. Commit changes
+git add _bar-descriptor.xml
+git commit -m "Bump version to 0.0.2.1"
+git push
+
+# 3. Create and push tag
+git tag -a v0.0.2.1 -m "Release v0.0.2.1"
 git push origin v0.0.2.1
 ```
 
-### Method 2: Manual Trigger
+The release will automatically include the built BAR file!
 
-1. Go to Actions tab in GitHub
-2. Select "Create Release" workflow
-3. Click "Run workflow"
-4. Enter the tag name (e.g., `v0.0.2.1`)
-5. Click "Run workflow"
+## Local Development
 
-## Configuration
+### Using Docker (Recommended)
 
-### Updating Version Numbers
-
-Before creating a release, update the version in `_bar-descriptor.xml`:
-
-```xml
-<versionNumber>0.0.2</versionNumber>
-<buildId>1</buildId>
-```
-
-This will be automatically detected and included in the release.
-
-### GitHub Secrets
-
-No secrets are required for basic operation. However, you may need to add:
-
-- `BB10_SIGNING_KEY` - If you want to sign the BAR files
-- `BB10_SIGNING_PASSWORD` - Password for the signing key
-
-## Customization
-
-### Adding Signing to Releases
-
-Modify the release workflow to include signing:
-
-```yaml
-- name: Sign BAR package
-  env:
-    SIGNING_PASSWORD: ${{ secrets.BB10_SIGNING_PASSWORD }}
-  run: |
-    blackberry-signer -storepass "$SIGNING_PASSWORD" \
-      -keystore ~/.rim/author.p12 \
-      Device-Release.bar
-```
-
-### Building for Simulator
-
-Add simulator build to workflows:
-
-```yaml
-- name: Build Simulator
-  run: |
-    make Simulator-Debug
-    make Simulator-Debug.bar
-```
-
-## File Structure
-
-The workflows expect these files in the repository root:
-- `_BGShellBB10.pro` - Qt project file
-- `_bar-descriptor.xml` - BlackBerry descriptor
-- `_Makefile` - Build makefile
-
-These are automatically copied to their working names (without `_` prefix) during the build.
-
-## Troubleshooting
-
-### NDK Not Found
-
-If you see "BB10 NDK not found" errors:
-1. Check that the NDK is properly installed in the runner
-2. Verify the path in the workflow matches your NDK location
-3. Ensure `bbndk-env.sh` exists and is sourced correctly
-
-### Build Failures
-
-Common issues:
-- Missing dependencies: Update the `apt-get install` section
-- QNX compiler errors: Verify NDK version compatibility
-- Permission issues: Ensure files have correct permissions
-
-### Release Upload Failures
-
-If release creation fails:
-1. Verify you have write permissions on the repository
-2. Check that the tag doesn't already exist
-3. Ensure BAR file was built successfully
-
-## Manual Build (Local)
-
-To build locally with the same process:
+Build locally using the same Docker image:
 
 ```bash
-# Prepare build files
+# Pull the image
+docker pull sw7ft/bb10-gcc9:latest
+
+# Prepare files
 cp _BGShellBB10.pro BGShellBB10.pro
 cp _bar-descriptor.xml bar-descriptor.xml
 cp _Makefile Makefile
 
-# Source BB10 environment
-source ~/bbndk/bbndk-env.sh
+# Build in Docker
+docker run --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  sw7ft/bb10-gcc9:latest \
+  bash -c "source /root/bbndk/bbndk-env_10_3_1_995.sh && \
+           export LC_ALL=C && \
+           make clean && \
+           make Device-Release && \
+           make Device-Release.bar"
 
-# Build
-make clean
-make Device-Release
-make Device-Release.bar
+# Your BAR file will be at Device-Release.bar
 ```
 
-## Additional Resources
+### Using the build script
 
-- [BlackBerry 10 NDK Documentation](https://developer.blackberry.com/native/)
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [QTermWidget Project](http://qtermwidget.sourceforge.net/)
+```bash
+# The build.sh script can be adapted for Docker
+./build.sh release
+```
+
+## Workflow Files
+
+### docker-build.yml
+**Purpose:** Continuous integration builds on every push
+
+**Triggers:**
+- Push to master/main/develop
+- Pull requests
+- Manual workflow dispatch
+
+**Output:** Build artifacts uploaded to GitHub Actions
+
+### release.yml
+**Purpose:** Create GitHub releases with BAR packages
+
+**Triggers:**
+- Tags matching: `v*.*.*`, `[0-9]+.[0-9]+.[0-9]+`, `release-*`
+- Manual workflow dispatch
+
+**Output:** 
+- GitHub release with BAR file
+- Source code archive
+- Auto-generated release notes
+
+## Checking Build Status
+
+```bash
+# View recent builds
+gh run list --repo QNXcraft/BGShellBB10 --limit 5
+
+# View specific run
+gh run view RUN_ID --repo QNXcraft/BGShellBB10 --log
+
+# Download build artifacts
+gh run download RUN_ID --repo QNXcraft/BGShellBB10
+```
+
+## Troubleshooting
+
+### Docker pull fails
+The image is publicly available on Docker Hub. If you can't pull it:
+```bash
+docker pull sw7ft/bb10-gcc9:latest
+```
+
+### Build fails in Docker
+Check the workflow logs:
+```bash
+gh run view --log-failed --repo QNXcraft/BGShellBB10
+```
+
+Common issues:
+- **Permissions**: Docker needs write access to workspace
+- **File paths**: Ensure `_*.pro`, `_*.xml` files exist
+- **Makefile errors**: Check Makefile syntax
+
+### BAR file not created
+Verify build completed successfully:
+```bash
+ls -la Device-Release.bar
+ls -la arm/o.le-v7/BGShellBB10
+```
+
+## Additional Information
+
+### Docker Image Details
+- **Image:** `sw7ft/bb10-gcc9:latest`
+- **NDK Version:** 10.3.1.995
+- **Base:** Ubuntu with Momentics IDE
+- **Environment:** Pre-configured with all BB10 build tools
+
+### No Setup Required!
+Unlike traditional CI/CD, you don't need to:
+- Install or configure BB10 NDK
+- Set up environment variables
+- Download large SDK files
+- Configure build tools
+
+Everything is included in the Docker image.
 
 ## Support
 
-For issues specific to:
-- **Build process**: Check this documentation and workflow files
-- **BGShellBB10 application**: Email support@bgmot.com
-- **GitHub Actions**: See GitHub Actions documentation
+- **Build issues:** Check workflow logs in GitHub Actions
+- **Docker issues:** Verify image is accessible: `docker pull sw7ft/bb10-gcc9:latest`
+- **Application issues:** Email support@bgmot.com
 
-## License
+## Links
 
-This build configuration follows the same license as the main project (see COPYING file).
+- Docker Image: https://hub.docker.com/r/sw7ft/bb10-gcc9
+- Actions: https://github.com/QNXcraft/BGShellBB10/actions
+- Releases: https://github.com/QNXcraft/BGShellBB10/releases
